@@ -4,6 +4,7 @@ from models.model import Informer, InformerStack
 
 from utils.tools import EarlyStopping, adjust_learning_rate
 from utils.metrics import metric
+from utils.losses import MultiObjectiveTimeSeriesLoss
 
 import numpy as np
 
@@ -107,8 +108,25 @@ class Exp_Informer(Exp_Basic):
         return model_optim
     
     def _select_criterion(self):
-        criterion =  nn.MSELoss()
-        return criterion
+        loss_type = self.args.loss.lower()
+        if loss_type == 'mse':
+            return nn.MSELoss()
+        if loss_type in ('multi', 'multiobj', 'multiobjective'):
+            period = self.args.season_period if self.args.season_period > 0 else None
+            return MultiObjectiveTimeSeriesLoss(
+                period=period,
+                trend_window=self.args.trend_window,
+                jump_horizon=self.args.jump_horizon,
+                jump_threshold=self.args.jump_threshold,
+                jump_pre_days=self.args.jump_pre_days,
+                alpha=self.args.loss_alpha,
+                beta=self.args.loss_beta,
+                gamma=self.args.loss_gamma,
+                delta=self.args.loss_delta,
+                jump_base_weight=self.args.jump_base_weight,
+                jump_scale=self.args.jump_scale,
+            )
+        raise ValueError(f"Unsupported loss type: {self.args.loss}")
 
     def vali(self, vali_data, vali_loader, criterion):
         self.model.eval()
