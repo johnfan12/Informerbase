@@ -40,6 +40,9 @@ The self-attention scores form a long-tail distribution, where the "active" quer
 - pandas == 0.25.1
 - scikit_learn == 0.21.3
 - torch == 1.8.0
+- transformers >= 4.40.0 *(required only for the LLM-as-loss workflow)*
+- accelerate >= 0.29.0 *(required only for the LLM-as-loss workflow)*
+- sentencepiece >= 0.1.99 *(required only for the LLM-as-loss workflow)*
 
 Dependencies can be installed using the following command:
 ```bash
@@ -109,6 +112,28 @@ python -u main_informer.py --model <model> --data <data>
 --use_amp --inverse --use_gpu <use_gpu> --gpu <gpu> --use_multi_gpu --devices <devices>
 ```
 
+### LLM-based scoring loss (experimental)
+
+Set `--loss llm` to replace the numeric loss with an instruction-tuned LLM that
+scores each forecast from **0-100** inside `<score>...</score>` tags. By default we
+load `Qwen/Qwen3-4B-Instruct-2507` via `transformers`:
+
+```bash
+python -u main_informer.py \
+  --model informer --data ETTh1 --loss llm \
+  --llm_model_name Qwen/Qwen3-4B-Instruct-2507 \
+  --llm_max_new_tokens 1024
+```
+
+During training we pass the look-back window, the model prediction, and the
+ground truth into a prompt that asks the LLM to critique the forecast and output
+`<score>73</score>` (for example). The reciprocal of the parsed score becomes
+the reported loss value. Because this objective is not differentiable with
+respect to the Informer weights, it is best treated as an auxiliary signal (for
+monitoring or curriculum strategies) alongside standard differentiable losses.
+Use the `--llm_*` arguments to customize the prompt, device map, temperature,
+and fallback behaviour.
+
 The detailed descriptions about the arguments are as following:
 
 | Parameter name | Description of parameter |
@@ -152,6 +177,7 @@ The detailed descriptions about the arguments are as following:
 | learning_rate | Optimizer learning rate (defaults to 0.0001) |
 | des | Experiment description (defaults to `test`) |
 | loss | Loss function (defaults to `mse`) |
+| llm_* | Arguments that configure the optional LLM-as-loss workflow (`--llm_model_name`, `--llm_max_new_tokens`, `--llm_temperature`, etc.) |
 | lradj | Ways to adjust the learning rate (defaults to `type1`) |
 | use_amp | Whether to use automatic mixed precision training, using this argument means using amp (defaults to `False`) |
 | inverse | Whether to inverse output data, using this argument means inversing output data (defaults to `False`) |

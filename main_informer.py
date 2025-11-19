@@ -4,6 +4,16 @@ import torch
 
 from exp.exp_informer import Exp_Informer
 
+def str2bool(value):
+    if isinstance(value, bool):
+        return value
+    if value.lower() in ('yes', 'true', 't', '1', 'y'):
+        return True
+    if value.lower() in ('no', 'false', 'f', '0', 'n'):
+        return False
+    raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 parser = argparse.ArgumentParser(description='[Informer] Long Sequences Forecasting')
 
 parser.add_argument('--model', type=str, required=True, default='informer',help='model of experiment, options: [informer, informerstack, informerlight(TBD)]')
@@ -48,7 +58,7 @@ parser.add_argument('--batch_size', type=int, default=32, help='batch size of tr
 parser.add_argument('--patience', type=int, default=3, help='early stopping patience')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='optimizer learning rate')
 parser.add_argument('--des', type=str, default='test',help='exp description')
-parser.add_argument('--loss', type=str, default='mse', choices=['mse', 'multi'], help='loss function type')
+parser.add_argument('--loss', type=str, default='mse', help='loss function type (mse, multi, llm)')
 parser.add_argument('--loss_alpha', type=float, default=1.0, help='weight for point-wise MSE component')
 parser.add_argument('--loss_beta', type=float, default=0.5, help='weight for trend component')
 parser.add_argument('--loss_gamma', type=float, default=0.5, help='weight for seasonal component')
@@ -60,6 +70,18 @@ parser.add_argument('--jump_threshold', type=float, default=1.0, help='absolute 
 parser.add_argument('--jump_pre_days', type=int, default=5, help='number of timesteps before a jump to emphasize')
 parser.add_argument('--jump_base_weight', type=float, default=1.0, help='base weight for jump-focused MSE window')
 parser.add_argument('--jump_scale', type=float, default=5.0, help='additional scaling applied to jump windows')
+parser.add_argument('--llm_model_name', type=str, default='Qwen/Qwen3-4B-Instruct-2507', help='HF repo or path for the scoring LLM')
+parser.add_argument('--llm_device_map', type=str, default='auto', help='device map hint passed to transformers when loading the scoring LLM')
+parser.add_argument('--llm_torch_dtype', type=str, default='auto', help='dtype hint for the scoring LLM (use "auto" to match weights)')
+parser.add_argument('--llm_max_new_tokens', type=int, default=512, help='maximum tokens generated when asking the scoring LLM')
+parser.add_argument('--llm_temperature', type=float, default=0.1, help='sampling temperature for the scoring LLM (0 = greedy)')
+parser.add_argument('--llm_min_score', type=float, default=1.0, help='lower bound applied to parsed <score> outputs')
+parser.add_argument('--llm_fallback_score', type=float, default=10.0, help='score to use when the LLM response cannot be parsed')
+parser.add_argument('--llm_max_rows', type=int, default=32, help='number of rows per tensor block included in the LLM prompt')
+parser.add_argument('--llm_precision', type=int, default=4, help='decimal precision for values shown to the LLM')
+parser.add_argument('--llm_system_prompt', type=str, default=None, help='override the default system prompt used for LLM scoring')
+parser.add_argument('--llm_user_prompt', type=str, default=None, help='override the default user prompt template used for LLM scoring')
+parser.add_argument('--llm_trust_remote_code', type=str2bool, default=True, help='whether to enable trust_remote_code when loading the scoring LLM')
 parser.add_argument('--lradj', type=str, default='type1',help='adjust learning rate')
 parser.add_argument('--use_amp', action='store_true', help='use automatic mixed precision training', default=False)
 parser.add_argument('--inverse', action='store_true', help='inverse output data', default=False)

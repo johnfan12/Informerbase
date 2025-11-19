@@ -4,7 +4,7 @@ from models.model import Informer, InformerStack
 
 from utils.tools import EarlyStopping, adjust_learning_rate
 from utils.metrics import metric
-from utils.losses import MultiObjectiveTimeSeriesLoss
+from utils.losses import LLMScoreLoss, MultiObjectiveTimeSeriesLoss
 
 import numpy as np
 
@@ -126,17 +126,38 @@ class Exp_Informer(Exp_Basic):
                 jump_base_weight=self.args.jump_base_weight,
                 jump_scale=self.args.jump_scale,
             )
+        if loss_type in ('llm', 'llm_score', 'llm-loss'):
+            return LLMScoreLoss(
+                model_name=self.args.llm_model_name,
+                device_map=self.args.llm_device_map,
+                torch_dtype=self.args.llm_torch_dtype,
+                max_new_tokens=self.args.llm_max_new_tokens,
+                temperature=self.args.llm_temperature,
+                min_score=self.args.llm_min_score,
+                fallback_score=self.args.llm_fallback_score,
+                max_rows=self.args.llm_max_rows,
+                precision=self.args.llm_precision,
+                system_prompt=self.args.llm_system_prompt,
+                user_prompt_template=self.args.llm_user_prompt,
+                trust_remote_code=self.args.llm_trust_remote_code,
+            )
         raise ValueError(f"Unsupported loss type: {self.args.loss}")
+
+    def _compute_loss(self, criterion, pred, true, batch_x):
+        if getattr(criterion, 'requires_context', False):
+            return criterion(pred, true, lookback=batch_x)
+        return criterion(pred, true)
 
     def vali(self, vali_data, vali_loader, criterion):
         self.model.eval()
         total_loss = []
-        for i, (batch_x,batch_y,batch_x_mark,batch_y_mark) in enumerate(vali_loader):
-            pred, true = self._process_one_batch(
-                vali_data, batch_x, batch_y, batch_x_mark, batch_y_mark)
-            loss = criterion(pred.detach().cpu(), true.detach().cpu())
-            total_loss.append(loss)
-        total_loss = np.average(total_loss)
+        with torch.no_grad():
+            for i, (batch_x,batch_y,batch_x_mark,batch_y_mark) in enumerate(vali_loader):
+                pred, true, batch_x_ctx = self._process_one_batch(
+                    vali_data, batch_x, batch_y, batch_x_mark, batch_y_mark)
+                loss = self._compute_loss(criterion, pred, true, batch_x_ctx)
+                total_loss.append(float(loss.detach().cpu()))
+        total_loss = float(np.average(total_loss))
         self.model.train()
         return total_loss
 
@@ -170,9 +191,9 @@ class Exp_Informer(Exp_Basic):
                 iter_count += 1
                 
                 model_optim.zero_grad()
-                pred, true = self._process_one_batch(
+                pred, true, batch_x_ctx = self._process_one_batch(
                     train_data, batch_x, batch_y, batch_x_mark, batch_y_mark)
-                loss = criterion(pred, true)
+                loss = self._compute_loss(criterion, pred, true, batch_x_ctx)
                 train_loss.append(loss.item())
                 
                 if (i+1) % 100==0:
@@ -218,11 +239,12 @@ class Exp_Informer(Exp_Basic):
         preds = []
         trues = []
         
-        for i, (batch_x,batch_y,batch_x_mark,batch_y_mark) in enumerate(test_loader):
-            pred, true = self._process_one_batch(
-                test_data, batch_x, batch_y, batch_x_mark, batch_y_mark)
-            preds.append(pred.detach().cpu().numpy())
-            trues.append(true.detach().cpu().numpy())
+        with torch.no_grad():
+            for i, (batch_x,batch_y,batch_x_mark,batch_y_mark) in enumerate(test_loader):
+                pred, true, _ = self._process_one_batch(
+                    test_data, batch_x, batch_y, batch_x_mark, batch_y_mark)
+                preds.append(pred.detach().cpu().numpy())
+                trues.append(true.detach().cpu().numpy())
 
         preds = np.array(preds)
         trues = np.array(trues)
@@ -257,10 +279,11 @@ class Exp_Informer(Exp_Basic):
         
         preds = []
         
-        for i, (batch_x,batch_y,batch_x_mark,batch_y_mark) in enumerate(pred_loader):
-            pred, true = self._process_one_batch(
-                pred_data, batch_x, batch_y, batch_x_mark, batch_y_mark)
-            preds.append(pred.detach().cpu().numpy())
+        with torch.no_grad():
+            for i, (batch_x,batch_y,batch_x_mark,batch_y_mark) in enumerate(pred_loader):
+                pred, _, _ = self._process_one_batch(
+                    pred_data, batch_x, batch_y, batch_x_mark, batch_y_mark)
+                preds.append(pred.detach().cpu().numpy())
 
         preds = np.array(preds)
         preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
@@ -304,4 +327,4 @@ class Exp_Informer(Exp_Basic):
         f_dim = -1 if self.args.features=='MS' else 0
         batch_y = batch_y[:,-self.args.pred_len:,f_dim:].to(self.device)
 
-        return outputs, batch_y
+        return outputs, batch_y, batch_x
