@@ -16,7 +16,7 @@ def str2bool(value):
 
 parser = argparse.ArgumentParser(description='[Informer] Long Sequences Forecasting')
 
-parser.add_argument('--model', type=str, required=True, default='informer',help='model of experiment, options: [informer, informerstack, informerlight(TBD)]')
+parser.add_argument('--model', type=str, required=True, default='informer',help='model of experiment, options: [informer, informerstack, hyperinformer]')
 
 parser.add_argument('--data', type=str, required=True, default='ETTh1', help='data')
 parser.add_argument('--root_path', type=str, default='./data/ETT/', help='root path of the data file')
@@ -86,6 +86,12 @@ parser.add_argument('--llm_propagate_zero_gradients', type=str2bool, default=Tru
 parser.add_argument('--lradj', type=str, default='type1',help='adjust learning rate')
 parser.add_argument('--use_amp', action='store_true', help='use automatic mixed precision training', default=False)
 parser.add_argument('--inverse', action='store_true', help='inverse output data', default=False)
+
+# HyperInformer specific
+parser.add_argument('--hyper_backbone', type=str, default='informer', help='backbone to wrap inside HyperInformer [informer, informerstack]')
+parser.add_argument('--hyper_z_dim', type=int, default=128, help='dimension for task-level latent z')
+parser.add_argument('--hyper_hidden_dim', type=int, default=128, help='hidden size of the hyper-network MLP')
+parser.add_argument('--hyper_pool', type=str, default='mean', help='pooling strategy for encoder outputs [mean, last]')
 
 parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')
 parser.add_argument('--gpu', type=int, default=0, help='gpu')

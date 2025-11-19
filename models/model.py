@@ -64,15 +64,26 @@ class Informer(nn.Module):
         # self.end_conv2 = nn.Conv1d(in_channels=d_model, out_channels=c_out, kernel_size=1, bias=True)
         self.projection = nn.Linear(d_model, c_out, bias=True)
         
-    def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec, 
-                enc_self_mask=None, dec_self_mask=None, dec_enc_mask=None):
+    def forward_features(self, x_enc, x_mark_enc, x_dec, x_mark_dec,
+                         enc_self_mask=None, dec_self_mask=None, dec_enc_mask=None):
+        """Return encoder and decoder hidden states before projection."""
         enc_out = self.enc_embedding(x_enc, x_mark_enc)
         enc_out, attns = self.encoder(enc_out, attn_mask=enc_self_mask)
 
         dec_out = self.dec_embedding(x_dec, x_mark_dec)
         dec_out = self.decoder(dec_out, enc_out, x_mask=dec_self_mask, cross_mask=dec_enc_mask)
+        return enc_out, dec_out, attns
+
+    def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec, 
+                enc_self_mask=None, dec_self_mask=None, dec_enc_mask=None):
+        enc_out, dec_out, attns = self.forward_features(
+            x_enc, x_mark_enc, x_dec, x_mark_dec,
+            enc_self_mask=enc_self_mask,
+            dec_self_mask=dec_self_mask,
+            dec_enc_mask=dec_enc_mask,
+        )
         dec_out = self.projection(dec_out)
-        
+
         # dec_out = self.end_conv1(dec_out)
         # dec_out = self.end_conv2(dec_out.transpose(2,1)).transpose(1,2)
         if self.output_attention:
@@ -141,15 +152,26 @@ class InformerStack(nn.Module):
         # self.end_conv2 = nn.Conv1d(in_channels=d_model, out_channels=c_out, kernel_size=1, bias=True)
         self.projection = nn.Linear(d_model, c_out, bias=True)
         
-    def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec, 
-                enc_self_mask=None, dec_self_mask=None, dec_enc_mask=None):
+    def forward_features(self, x_enc, x_mark_enc, x_dec, x_mark_dec,
+                         enc_self_mask=None, dec_self_mask=None, dec_enc_mask=None):
+        """Return encoder and decoder hidden states before projection."""
         enc_out = self.enc_embedding(x_enc, x_mark_enc)
         enc_out, attns = self.encoder(enc_out, attn_mask=enc_self_mask)
 
         dec_out = self.dec_embedding(x_dec, x_mark_dec)
         dec_out = self.decoder(dec_out, enc_out, x_mask=dec_self_mask, cross_mask=dec_enc_mask)
+        return enc_out, dec_out, attns
+
+    def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec, 
+                enc_self_mask=None, dec_self_mask=None, dec_enc_mask=None):
+        enc_out, dec_out, attns = self.forward_features(
+            x_enc, x_mark_enc, x_dec, x_mark_dec,
+            enc_self_mask=enc_self_mask,
+            dec_self_mask=dec_self_mask,
+            dec_enc_mask=dec_enc_mask,
+        )
         dec_out = self.projection(dec_out)
-        
+
         # dec_out = self.end_conv1(dec_out)
         # dec_out = self.end_conv2(dec_out.transpose(2,1)).transpose(1,2)
         if self.output_attention:

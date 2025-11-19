@@ -1,6 +1,7 @@
 from data.data_loader import Dataset_ETT_hour, Dataset_ETT_minute, Dataset_Custom, Dataset_Pred
 from exp.exp_basic import Exp_Basic
 from models.model import Informer, InformerStack
+from models.hyper_informer import HyperInformer
 
 from utils.tools import EarlyStopping, adjust_learning_rate
 from utils.metrics import metric
@@ -11,6 +12,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch import optim
+from torch.cuda.amp.autocast_mode import autocast
+from torch.cuda.amp.grad_scaler import GradScaler
 from torch.utils.data import DataLoader
 
 import os
@@ -25,25 +28,26 @@ class Exp_Informer(Exp_Basic):
     
     def _build_model(self):
         model_dict = {
-            'informer':Informer,
-            'informerstack':InformerStack,
+            'informer': Informer,
+            'informerstack': InformerStack,
+            'hyperinformer': HyperInformer,
         }
-        if self.args.model=='informer' or self.args.model=='informerstack':
-            e_layers = self.args.e_layers if self.args.model=='informer' else self.args.s_layers
+        if self.args.model in ('informer', 'informerstack'):
+            e_layers = self.args.e_layers if self.args.model == 'informer' else self.args.s_layers
             model = model_dict[self.args.model](
                 self.args.enc_in,
-                self.args.dec_in, 
-                self.args.c_out, 
-                self.args.seq_len, 
+                self.args.dec_in,
+                self.args.c_out,
+                self.args.seq_len,
                 self.args.label_len,
-                self.args.pred_len, 
+                self.args.pred_len,
                 self.args.factor,
-                self.args.d_model, 
-                self.args.n_heads, 
-                e_layers, # self.args.e_layers,
-                self.args.d_layers, 
+                self.args.d_model,
+                self.args.n_heads,
+                e_layers,
+                self.args.d_layers,
                 self.args.d_ff,
-                self.args.dropout, 
+                self.args.dropout,
                 self.args.attn,
                 self.args.embed,
                 self.args.freq,
@@ -51,7 +55,38 @@ class Exp_Informer(Exp_Basic):
                 self.args.output_attention,
                 self.args.distil,
                 self.args.mix,
-                self.device
+                self.device,
+            ).float()
+        elif self.args.model == 'hyperinformer':
+            backbone_type = getattr(self.args, 'hyper_backbone', 'informer')
+            stack_layers = self.args.s_layers if backbone_type == 'informerstack' else None
+            model = model_dict[self.args.model](
+                self.args.enc_in,
+                self.args.dec_in,
+                self.args.c_out,
+                self.args.seq_len,
+                self.args.label_len,
+                self.args.pred_len,
+                self.args.factor,
+                self.args.d_model,
+                self.args.n_heads,
+                self.args.e_layers,
+                self.args.d_layers,
+                self.args.d_ff,
+                self.args.dropout,
+                self.args.attn,
+                self.args.embed,
+                self.args.freq,
+                self.args.activation,
+                self.args.output_attention,
+                self.args.distil,
+                self.args.mix,
+                self.device,
+                backbone_type=backbone_type,
+                stack_layers=stack_layers,
+                z_dim=self.args.hyper_z_dim,
+                hyper_hidden_dim=self.args.hyper_hidden_dim,
+                pool=self.args.hyper_pool,
             ).float()
         
         if self.args.use_multi_gpu and self.args.use_gpu:
@@ -180,7 +215,7 @@ class Exp_Informer(Exp_Basic):
         criterion =  self._select_criterion()
 
         if self.args.use_amp:
-            scaler = torch.cuda.amp.GradScaler()
+            scaler = GradScaler()
 
         for epoch in range(self.args.train_epochs):
             iter_count = 0
@@ -313,7 +348,7 @@ class Exp_Informer(Exp_Basic):
         dec_inp = torch.cat([batch_y[:,:self.args.label_len,:], dec_inp], dim=1).float().to(self.device)
         # encoder - decoder
         if self.args.use_amp:
-            with torch.cuda.amp.autocast():
+            with autocast():
                 if self.args.output_attention:
                     outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
                 else:

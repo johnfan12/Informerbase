@@ -112,6 +112,30 @@ python -u main_informer.py --model <model> --data <data>
 --use_amp --inverse --use_gpu <use_gpu> --gpu <gpu> --use_multi_gpu --devices <devices>
 ```
 
+### HyperInformer: task-adaptive prediction heads
+
+`HyperInformer` reuses the Informer encoder/decoder stack as a backbone and adds two new modules:
+
+- `SeriesEncoder`: pools the encoder hidden states into a task-level representation `z`.
+- `HyperHead`: maps `z` to per-sample projection parameters `W, b` so each series receives its own lightweight head.
+
+This makes every batch element zero-shot adaptive without changing the data pipeline. Enable it by passing `--model hyperinformer` along with the new hyper-network flags:
+
+```bash
+bash scripts/Hyper_ETTh1.sh
+```
+
+or directly:
+
+```bash
+python -u main_informer.py \
+  --model hyperinformer --data ETTh1 --features M \
+  --seq_len 96 --label_len 48 --pred_len 24 \
+  --hyper_z_dim 128 --hyper_hidden_dim 256 --hyper_pool mean
+```
+
+`HyperInformer` accepts the same forecasting arguments as the base Informer and adds knobs to control the latent size, hyper-network depth, and pooling type.
+
 ### LLM-based scoring loss (experimental)
 
 Set `--loss llm` to replace the numeric loss with an instruction-tuned LLM that
@@ -189,6 +213,10 @@ The detailed descriptions about the arguments are as following:
 | gpu | The gpu no, used for training and inference (defaults to 0) |
 | use_multi_gpu | Whether to use multiple gpus, using this argument means using mulitple gpus (defaults to `False`) |
 | devices | Device ids of multile gpus (defaults to `0,1,2,3`) |
+| hyper_backbone | Backbone inside HyperInformer (`informer` or `informerstack`, defaults to `informer`) |
+| hyper_z_dim | Dimension of the SeriesEncoder latent (defaults to 128) |
+| hyper_hidden_dim | Hidden size of the HyperHead MLP (defaults to 128) |
+| hyper_pool | Pooling strategy used by SeriesEncoder (`mean` or `last`, defaults to `mean`) |
 
 
 ## <span id="resultslink">Results</span>
