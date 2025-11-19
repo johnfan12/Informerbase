@@ -140,6 +140,7 @@ class Exp_Informer(Exp_Basic):
                 system_prompt=self.args.llm_system_prompt,
                 user_prompt_template=self.args.llm_user_prompt,
                 trust_remote_code=self.args.llm_trust_remote_code,
+                propagate_zero_gradients=self.args.llm_propagate_zero_gradients,
             )
         raise ValueError(f"Unsupported loss type: {self.args.loss}")
 

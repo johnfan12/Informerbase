@@ -1,5 +1,6 @@
 import re
 import textwrap
+import warnings
 from typing import Optional
 
 import torch
@@ -233,6 +234,7 @@ class LLMScoreLoss(nn.Module):
         system_prompt: Optional[str] = None,
         user_prompt_template: Optional[str] = None,
         trust_remote_code: bool = True,
+        propagate_zero_gradients: bool = True,
     ) -> None:
         super().__init__()
         if AutoTokenizer is None or AutoModelForCausalLM is None:
@@ -282,6 +284,8 @@ class LLMScoreLoss(nn.Module):
             indicate closer alignment to the ground truth.
             """
         ).strip()
+        self.propagate_zero_gradients = propagate_zero_gradients
+        self._warned_zero_grad = False
 
     def forward(
         self,
@@ -308,7 +312,17 @@ class LLMScoreLoss(nn.Module):
             batch_losses.append(self._score_to_loss(score))
 
         loss_tensor = torch.tensor(batch_losses, dtype=y_pred.dtype, device=y_pred.device)
-        return loss_tensor.mean()
+        loss_value = loss_tensor.mean()
+
+        if self.propagate_zero_gradients and y_pred.requires_grad:
+            if not self._warned_zero_grad:
+                warnings.warn(
+                    "LLMScoreLoss is gradient-free; gradients propagated to the model will be zero."
+                )
+                self._warned_zero_grad = True
+            dummy = (y_pred - y_pred.detach()).sum()
+            loss_value = loss_value + dummy * 0.0
+        return loss_value
 
     def _build_prompt(
         self,

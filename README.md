@@ -131,6 +131,10 @@ ground truth into a prompt that asks the LLM to critique the forecast and output
 the reported loss value. Because this objective is not differentiable with
 respect to the Informer weights, it is best treated as an auxiliary signal (for
 monitoring or curriculum strategies) alongside standard differentiable losses.
+If you still want to call `backward()` with `--loss llm`, set the default
+`--llm_propagate_zero_gradients true` (enabled by default). This injects a
+zero-gradient bridge so training loops do not crash, but parameter updates will
+still be zero unless you blend in another differentiable objective.
 Use the `--llm_*` arguments to customize the prompt, device map, temperature,
 and fallback behaviour.
 
@@ -177,7 +181,7 @@ The detailed descriptions about the arguments are as following:
 | learning_rate | Optimizer learning rate (defaults to 0.0001) |
 | des | Experiment description (defaults to `test`) |
 | loss | Loss function (defaults to `mse`) |
-| llm_* | Arguments that configure the optional LLM-as-loss workflow (`--llm_model_name`, `--llm_max_new_tokens`, `--llm_temperature`, etc.) |
+| llm_* | Arguments that configure the optional LLM-as-loss workflow (`--llm_model_name`, `--llm_max_new_tokens`, `--llm_temperature`, `--llm_propagate_zero_gradients`, etc.) |
 | lradj | Ways to adjust the learning rate (defaults to `type1`) |
 | use_amp | Whether to use automatic mixed precision training, using this argument means using amp (defaults to `False`) |
 | inverse | Whether to inverse output data, using this argument means inversing output data (defaults to `False`) |

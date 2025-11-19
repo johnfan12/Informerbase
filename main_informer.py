@@ -82,6 +82,7 @@ parser.add_argument('--llm_precision', type=int, default=4, help='decimal precis
 parser.add_argument('--llm_system_prompt', type=str, default=None, help='override the default system prompt used for LLM scoring')
 parser.add_argument('--llm_user_prompt', type=str, default=None, help='override the default user prompt template used for LLM scoring')
 parser.add_argument('--llm_trust_remote_code', type=str2bool, default=True, help='whether to enable trust_remote_code when loading the scoring LLM')
+parser.add_argument('--llm_propagate_zero_gradients', type=str2bool, default=True, help='if true, attaches a zero-gradient bridge so backward() works (but gradients stay zero)')
 parser.add_argument('--lradj', type=str, default='type1',help='adjust learning rate')
 parser.add_argument('--use_amp', action='store_true', help='use automatic mixed precision training', default=False)
 parser.add_argument('--inverse', action='store_true', help='inverse output data', default=False)
