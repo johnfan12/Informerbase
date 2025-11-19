@@ -92,6 +92,7 @@ parser.add_argument('--hyper_backbone', type=str, default='informer', help='back
 parser.add_argument('--hyper_z_dim', type=int, default=128, help='dimension for task-level latent z')
 parser.add_argument('--hyper_hidden_dim', type=int, default=128, help='hidden size of the hyper-network MLP')
 parser.add_argument('--hyper_pool', type=str, default='mean', help='pooling strategy for encoder outputs [mean, last]')
+parser.add_argument('--hyper_freeze_epoch', type=int, default=-1, help='freeze Informer backbone after this epoch (<=0 disables)')
 
 parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')
 parser.add_argument('--gpu', type=int, default=0, help='gpu')

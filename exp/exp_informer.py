@@ -25,6 +25,7 @@ warnings.filterwarnings('ignore')
 class Exp_Informer(Exp_Basic):
     def __init__(self, args):
         super(Exp_Informer, self).__init__(args)
+        self._hyper_backbone_frozen = False
     
     def _build_model(self):
         model_dict = {
@@ -138,9 +139,34 @@ class Exp_Informer(Exp_Basic):
 
         return data_set, data_loader
 
-    def _select_optimizer(self):
-        model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate)
-        return model_optim
+    def _select_optimizer(self, lr=None):
+        trainable_params = filter(lambda p: p.requires_grad, self.model.parameters())
+        lr = self.args.learning_rate if lr is None else lr
+        return optim.Adam(trainable_params, lr=lr)
+
+    def _get_core_model(self):
+        return self.model.module if hasattr(self.model, 'module') else self.model
+
+    def _maybe_transition_to_hyper_phase(self, epoch_idx, optimizer):
+        if self._hyper_backbone_frozen:
+            return optimizer
+        if getattr(self.args, 'model', None) != 'hyperinformer':
+            return optimizer
+        freeze_epoch = getattr(self.args, 'hyper_freeze_epoch', -1)
+        if freeze_epoch <= 0 or (epoch_idx + 1) < freeze_epoch:
+            return optimizer
+        core_model = self._get_core_model()
+        backbone = getattr(core_model, 'backbone', None)
+        if backbone is None:
+            return optimizer
+        for param in backbone.parameters():
+            param.requires_grad = False
+        self._hyper_backbone_frozen = True
+        current_lr = None
+        if optimizer is not None and optimizer.param_groups:
+            current_lr = optimizer.param_groups[0].get('lr', None)
+        print(f"[HyperInformer] Backbone frozen after epoch {epoch_idx + 1}. Training hyper head only.")
+        return self._select_optimizer(lr=current_lr)
     
     def _select_criterion(self):
         loss_type = self.args.loss.lower()
@@ -261,6 +287,7 @@ class Exp_Informer(Exp_Basic):
                 break
 
             adjust_learning_rate(model_optim, epoch+1, self.args)
+            model_optim = self._maybe_transition_to_hyper_phase(epoch, model_optim)
             
         best_model_path = path+'/'+'checkpoint.pth'
         self.model.load_state_dict(torch.load(best_model_path))

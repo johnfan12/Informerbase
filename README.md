@@ -136,6 +136,8 @@ python -u main_informer.py \
 
 `HyperInformer` accepts the same forecasting arguments as the base Informer and adds knobs to control the latent size, hyper-network depth, and pooling type.
 
+Need a staged curriculum? Set `--hyper_freeze_epoch 6` (for example) to co-train the backbone for six epochs, then freeze its weights so that only the hyper-network (`SeriesEncoder` + `HyperHead`) keeps learning.
+
 ### LLM-based scoring loss (experimental)
 
 Set `--loss llm` to replace the numeric loss with an instruction-tuned LLM that
@@ -217,6 +219,7 @@ The detailed descriptions about the arguments are as following:
 | hyper_z_dim | Dimension of the SeriesEncoder latent (defaults to 128) |
 | hyper_hidden_dim | Hidden size of the HyperHead MLP (defaults to 128) |
 | hyper_pool | Pooling strategy used by SeriesEncoder (`mean` or `last`, defaults to `mean`) |
+| hyper_freeze_epoch | Epoch index (1-based) after which the Informer backbone is frozen and only the hyper head trains (defaults to -1 = disabled) |
 
 
 ## <span id="resultslink">Results</span>
